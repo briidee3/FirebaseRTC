@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "fir-rtc-89b99",
+    "default": "fir-rtc-webrtc-practice-a830d",
     "WebRTC-Practice": "fir-rtc-webrtc-practice-a830d"
   },
   "targets": {}

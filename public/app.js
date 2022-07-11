@@ -31,25 +31,14 @@ async function createRoom() {
   document.querySelector('#createBtn').disabled = true;
   document.querySelector('#joinBtn').disabled = true;
   const db = firebase.firestore();
+  const roomRef = await db.collection('rooms').doc();
 
   console.log('Create PeerConnection with configuration: ', configuration);
   peerConnection = new RTCPeerConnection(configuration);
 
   registerPeerConnectionListeners();
 
-  // Add code for creating a room here
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-
-  const roomWithOffer = {
-    offer: {
-      type: offer.type,
-      sdp: offer.sdp
-    }
-  }
-  const roomRef = await db.collection('rooms').add(roomWithOffer);
-  const roomId = roomRef.id;
-  document.querySelector('#currentRoom').innerText = `Current room is ${roomId} - You are the caller!`;
+  // Add code for creating a room here -- note: doesn't work here, tutorial needs to be fixed.
 
   // Code for creating room above
   
@@ -62,8 +51,23 @@ async function createRoom() {
   // Code for creating a room above
 
   // Code for collecting ICE candidates below
-  await collectIceCandidates(roomRef, peerConnection, callerCandidates, calleeCandidates);
+  await collectIceCandidates(roomRef, peerConnection, 'callerCandidates', 'calleeCandidates');
   // Code for collecting ICE candidates above
+
+  // Creating a new room
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+
+  const roomWithOffer = {
+    offer: {
+      type: offer.type,
+      sdp: offer.sdp
+    }
+  }
+  await roomRef.set(roomWithOffer);
+  const roomId = roomRef.id;
+  document.querySelector('#currentRoom').innerText = `Current room is ${roomId} - You are the caller!`;
+  // Creating a new room above
 
   peerConnection.addEventListener('track', event => {
     console.log('Got remote track:', event.streams[0]);
@@ -121,7 +125,7 @@ async function joinRoomById(roomId) {
     });
 
     // Code for collecting ICE candidates below
-    await collectIceCandidates(roomRef, peerConnection, calleeCandidates, callerCandidates);
+    await collectIceCandidates(roomRef, peerConnection, 'calleeCandidates', 'callerCandidates');
     // Code for collecting ICE candidates above
 
     peerConnection.addEventListener('track', event => {
@@ -133,7 +137,6 @@ async function joinRoomById(roomId) {
     });
 
     // Code for creating SDP answer below
-
     const offer = roomSnapshot.data().offer;
     await peerConnection.setRemoteDescription(offer);
     const answer = await peerConnection.createAnswer();
@@ -152,6 +155,27 @@ async function joinRoomById(roomId) {
     // Listening for remote ICE candidates below
     // Listening for remote ICE candidates above
   }
+}
+
+// Function for handling ICE candidates
+async function collectIceCandidates(roomRef, peerConnection, localName, remoteName) {
+  const candidatesCollection = roomRef.collection(localName);
+
+  peerConnection.addEventListener('icecandidate', event => {
+    if (event.candidate) {
+      const json = event.candidate.toJSON();
+      candidatesCollection.add(json);
+    }
+  });
+
+  roomRef.collection(remoteName).onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const candidate = new RTCIceCandidate(change.doc.data());
+        peerConnection.addIceCandidate(candidate);
+      }
+    });
+  })
 }
 
 async function openUserMedia(e) {
@@ -209,26 +233,6 @@ async function hangUp(e) {
   document.location.reload(true);
 }
 
-// Function for handling ICE candidates
-async function collectIceCandidates(roomRef, peerConnection, localName, remoteName) {
-  const candidatesCollection = roomRef.collection(localName);
-
-  peerConnection.addEventListener('icecandidate', event => {
-    if (event.candidate) {
-      const json = event.candidate.toJSON();
-      candidatesCollection.add(json);
-    }
-  });
-
-  roomRef.collection(remoteName).onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "added") {
-        const candidate = new RTCIceCandidate(change.doc.data());
-        peerConnection.addIceCandidate(candidate);
-      }
-    });
-  })
-}
 
 function registerPeerConnectionListeners() {
   peerConnection.addEventListener('icegatheringstatechange', () => {
