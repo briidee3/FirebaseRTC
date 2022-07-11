@@ -62,7 +62,7 @@ async function createRoom() {
   // Code for creating a room above
 
   // Code for collecting ICE candidates below
-
+  await collectIceCandidates(roomRef, peerConnection, callerCandidates, calleeCandidates);
   // Code for collecting ICE candidates above
 
   peerConnection.addEventListener('track', event => {
@@ -121,7 +121,7 @@ async function joinRoomById(roomId) {
     });
 
     // Code for collecting ICE candidates below
-
+    await collectIceCandidates(roomRef, peerConnection, calleeCandidates, callerCandidates);
     // Code for collecting ICE candidates above
 
     peerConnection.addEventListener('track', event => {
@@ -150,7 +150,6 @@ async function joinRoomById(roomId) {
     // Code for creating SDP answer above
 
     // Listening for remote ICE candidates below
-
     // Listening for remote ICE candidates above
   }
 }
@@ -210,7 +209,26 @@ async function hangUp(e) {
   document.location.reload(true);
 }
 
-// 
+// Function for handling ICE candidates
+async function collectIceCandidates(roomRef, peerConnection, localName, remoteName) {
+  const candidatesCollection = roomRef.collection(localName);
+
+  peerConnection.addEventListener('icecandidate', event => {
+    if (event.candidate) {
+      const json = event.candidate.toJSON();
+      candidatesCollection.add(json);
+    }
+  });
+
+  roomRef.collection(remoteName).onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const candidate = new RTCIceCandidate(change.doc.data());
+        peerConnection.addIceCandidate(candidate);
+      }
+    });
+  })
+}
 
 function registerPeerConnectionListeners() {
   peerConnection.addEventListener('icegatheringstatechange', () => {
