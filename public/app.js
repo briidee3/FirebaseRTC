@@ -51,17 +51,6 @@ async function createRoom() {
   const roomId = roomRef.id;
   document.querySelector('#currentRoom').innerText = `Current room is ${roomId} - You are the caller!`;
 
-  // Detect when an answer from the callee has been added
-  roomRef.onSnapshot(async snapshot => {
-    console.log('Got updated room:', snapshot.data());
-    const data = snapshot.data();
-    if (!peerConnection.currentRemoteDescription && data.answer) {
-      console.log('Set remote description: ', data.answer);
-      const answer = new RTCSessionDescription(data.answer)
-      await peerConnection.setRemoteDescription(answer);
-    }
-  });
-
   // Code for creating room above
   
   localStream.getTracks().forEach(track => {
@@ -85,7 +74,16 @@ async function createRoom() {
   });
 
   // Listening for remote session description below
-
+  // Detect when an answer from the callee has been added
+  roomRef.onSnapshot(async snapshot => {
+    console.log('Got updated room:', snapshot.data());
+    const data = snapshot.data();
+    if (!peerConnection.currentRemoteDescription && data.answer) {
+      console.log('Set remote description: ', data.answer);
+      const answer = new RTCSessionDescription(data.answer)
+      await peerConnection.setRemoteDescription(answer);
+   }
+  });
   // Listening for remote session description above
 
   // Listen for remote ICE candidates below
@@ -135,6 +133,19 @@ async function joinRoomById(roomId) {
     });
 
     // Code for creating SDP answer below
+
+    const offer = roomSnapshot.data().offer;
+    await peerConnection.setRemoteDescription(offer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    const roomWithAnswer = {
+      answer: {
+        type: answer.type,
+        sdp: answer.sdp
+      }
+    }
+    await roomRef.update(roomWithAnswer);
 
     // Code for creating SDP answer above
 
@@ -198,6 +209,8 @@ async function hangUp(e) {
 
   document.location.reload(true);
 }
+
+// 
 
 function registerPeerConnectionListeners() {
   peerConnection.addEventListener('icegatheringstatechange', () => {
